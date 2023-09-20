@@ -115,7 +115,8 @@ def calibrate_probs(p_pred,
                     betas,
                     jumping_rates,
                     pi,
-                    return_martingale
+                    return_martingale=False,
+                    inductive=False
                     ):
     """ Calculates protected calibraated probabilities.
 
@@ -141,6 +142,9 @@ def calibrate_probs(p_pred,
 
                 return_martingale : bool, default = False
                     Flag specifies whether to calculate and return martingale values
+
+                inductive: bool, default = False
+                    Flag specifying whether to return active_weight and passive_weight instead of probabilities
 
                 Returns
                 ----------
@@ -237,13 +241,19 @@ def calibrate_probs(p_pred,
 
     p_prime = p_prime / np.repeat(p_prime.sum(axis=1).reshape(-1, 1), n_classes, axis=1)
 
-    if return_martingale:
-        return p_prime, log_sj_martingale, log_cj_martingale, mart_capital
+    if not inductive:
+        if return_martingale:
+            return p_prime, log_sj_martingale, log_cj_martingale, mart_capital
+        else:
+            return p_prime
     else:
-        return p_prime
+        if return_martingale:
+            return active_weight, passive_weight, log_sj_martingale, log_cj_martingale, mart_capital
+        else:
+            return active_weight, passive_weight
 
 
-class ProtectedCalibration:
+class ProtectedClassification:
     """ A wrapper for Protected Probabilistic Classification
 
             A class implementing Protected Probabilistic Classification as decribed in [1].
@@ -273,6 +283,8 @@ class ProtectedCalibration:
         self.estimator = estimator
         self.cal_probs = None
         self.classes = None
+        self.active_weight = None
+        self.passive_weight = None
 
     def calibrate(
             self,
@@ -381,7 +393,7 @@ class ProtectedCalibration:
 
             Returns
             ----------
-            y_pred: {array-like}, shape (n_samples, n_classses) if one_hot=True otherwise shape (n_samples)
+            y_pred: {array-like}, shape (n_samples, n_classes) if one_hot=True otherwise shape (n_samples)
                 Protected calibrated probabilities
         """
 
