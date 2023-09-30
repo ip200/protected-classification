@@ -5,7 +5,7 @@ from sklearn.exceptions import NotFittedError
 
 
 def gen_alpha(ind, size, alpha):
-    """ Calculates Alpha paramaters for the Cox calibrator
+    """ Calculates Alpha parameters for the Cox calibrator
 
             Parameters
             ----------
@@ -33,7 +33,7 @@ def cox_multiclass(p, alpha, beta):
     """ Generates Cox calibration probability outputs
 
         For more details of the use of Cox calibrating functions in Protected calibration see Section 2 in [1]
-        The original decription of Cox calibrating functions can be found in Section 3 in [2]
+        The original description of Cox calibrating functions can be found in Section 3 in [2]
 
             Parameters
             ----------
@@ -109,154 +109,10 @@ def log_mean(x):
     return m + np.log10(np.mean(np.exp(np.log(10) * (x - m))))
 
 
-def calibrate_probs(p_pred,
-                    y_test,
-                    alphas,
-                    betas,
-                    jumping_rates,
-                    pi,
-                    return_martingale=False,
-                    inductive=False
-                    ):
-    """ Calculates protected calibraated probabilities.
-
-                Parameters
-                ----------
-                p_pred : {array-like}, shape (n_samples, n_classes)
-                    A set of probabilities to be calibrated
-
-                y_test : {array-like}, shape (n_samples,)
-                    Associated class labels
-
-                alphas : {array-like}
-                    Alpha parameters of Cox calibtration functions (see Section 2 in [1])
-
-                betas : {array-like}, shape (n_samples,)
-                    Beta parameters of Cox calibtration functions (see Section 2 in [1])
-
-                jumping_rates: {array-like}
-                    Jumping rates for the Composite Jumper algorithm described in [1]
-
-                pi : float
-                    Passive capital parameter for the Composite Jumper algorithm described in [1]
-
-                return_martingale : bool, default = False
-                    Flag specifies whether to calculate and return martingale values
-
-                inductive: bool, default = False
-                    Flag specifying whether to return active_weight and passive_weight instead of probabilities
-
-                Returns
-                ----------
-                p_prime: {array-like}, shape (n_samples,)
-                    Calibrated probabilities
-
-                References
-                __________
-                [1] Vovk, Vladimir, Ivan Petej, and Alex Gammerman. "Protected probabilistic classification."
-                In Conformal and Probabilistic Prediction and Applications, pp. 297-299. PMLR, 2021.
-                (arxiv version https://arxiv.org/pdf/2107.01726.pdf)
-                """
-
-    n_jumping_rates = len(jumping_rates)
-    n_test = len(y_test)
-    y_test_encoded = y_encode(y_test)
-    n_calibrators = len(betas) * len(alphas)
-    n_classes = len(np.unique(y_test))
-
-    prob_list = np.zeros((n_classes, n_classes))
-
-    for i in range(n_classes):
-        prob_list[i, i] = 1
-    prob_list = list(prob_list)
-
-    cal_list = [list((a, b)) for a in alphas for b in betas]
-
-    p_prime = np.empty((n_test, n_classes))
-    # Defining storage for martingales
-    log_sj_martingale = np.zeros((n_jumping_rates, n_test + 1))
-    log_cj_martingale = np.zeros(n_test + 1)
-
-    # the normalized capital in each state (after normalization at the previous step)
-    mart_capital = np.zeros((n_jumping_rates, n_calibrators))
-    mart_capital[:, 0] = 1
-
-    # Processing the dataset
-    passive_weight = pi  # amount set aside (passive weight)
-    active_weight = np.zeros((n_jumping_rates, n_calibrators))  # the weight of each active state
-    active_weight[:, 0] = (1 - pi) / n_jumping_rates  # initial weights
-    for n in range(n_test):  # going through all test observations
-        # Jump-mixing starts
-        for j_index in range(n_jumping_rates):
-            capital = np.sum(active_weight[j_index, :])  # active capital for this jumping rate
-            j_rate = jumping_rates[j_index]
-            active_weight[j_index, :] = (1 - j_rate) * active_weight[j_index, :] + capital * j_rate / n_calibrators
-            mart_capital[j_index, :] = (1 - j_rate) * mart_capital[j_index, :] + (j_rate / n_calibrators)
-        # Jump-mixing ends
-        g = np.empty(n_classes)  # pseudo prediction initialized
-        for prob_index, prob_i in enumerate(prob_list):
-            # initializing the pseudo prediction to its passive component
-            g[prob_index] = passive_weight * np.exp(-brier_loss(np.array(prob_i).reshape(1, -1), p_pred[n]))
-            for k in range(n_calibrators):
-                # prediction calibrated by the k-th calibrator
-                cal_pp_k = cox_multiclass(p_pred[n], cal_list[k][0], cal_list[k][1])
-                for j_index in range(n_jumping_rates):
-                    # accumulating predictions calibrated by the calibrators
-                    g[prob_index] += active_weight[j_index, k] * np.exp(
-                        -brier_loss(np.array(prob_i).reshape(1, -1), cal_pp_k))
-            g[prob_index] = -np.log(g[prob_index])
-        # We need to solve equation for s, let's first try a shortcut:
-        s = (2 + np.sum(g)) / n_classes
-        for k_index in range(n_classes):
-            p_prime[n, k_index] = (s - g[k_index]) / 2  # my prediction
-        # Updating the weights:
-        # updating the passive capital
-        passive_weight *= np.exp(-brier_loss(y_test_encoded[n].reshape(1, -1), p_pred[n]))
-        for k in range(n_calibrators):
-            # base prediction calibrated by the k-th calibrator
-            cal_pp_k = cox_multiclass(p_pred[n], cal_list[k][0], cal_list[k][1])
-            for j_index in range(n_jumping_rates):
-                # updating the active capital
-                active_weight[j_index, k] *= np.exp(-brier_loss(y_test_encoded[n].reshape(1, -1), cal_pp_k))
-                mart_capital[j_index, k] *= \
-                    np.exp(-brier_loss(y_test_encoded[n].reshape(1, -1), cal_pp_k)) /\
-                    np.exp(-brier_loss(y_test_encoded[n].reshape(1, -1), p_pred[n]))
-        for j_index in range(n_jumping_rates):
-            log_sj_martingale[j_index, n + 1] = log_sj_martingale[j_index, n] + \
-                                                np.log10(np.sum(mart_capital[j_index, :]))
-            mart_capital[j_index, :] /= np.sum(mart_capital[j_index, :])
-        # Normalizing at each step (not needed):
-        capital = passive_weight + np.sum(active_weight[:, :])  # the overall weight
-        passive_weight /= capital  # normalization of the passive weight
-        active_weight[:, :] /= capital  # normalization of the active weights
-
-    if np.sum(p_prime < 0) > 0:
-        p_prime[p_prime < 0] = 0
-    if np.sum(p_prime > 1) > 0:
-        p_prime[p_prime > 1] = 1
-
-    if return_martingale:
-        for n in range(n_test + 1):
-            log_cj_martingale[n] = log_mean([0, log_mean(log_sj_martingale[:, n])])
-
-    p_prime = p_prime / np.repeat(p_prime.sum(axis=1).reshape(-1, 1), n_classes, axis=1)
-
-    if not inductive:
-        if return_martingale:
-            return p_prime, log_sj_martingale, log_cj_martingale, mart_capital
-        else:
-            return p_prime
-    else:
-        if return_martingale:
-            return active_weight, passive_weight, log_sj_martingale, log_cj_martingale, mart_capital
-        else:
-            return active_weight, passive_weight
-
-
 class ProtectedClassification:
     """ A wrapper for Protected Probabilistic Classification
 
-            A class implementing Protected Probabilistic Classification as decribed in [1].
+            A class implementing Protected Probabilistic Classification as described in [1].
 
             For more details of usage see Examples below.
 
@@ -265,6 +121,21 @@ class ProtectedClassification:
 
             estimator : sci-kit learn estimator instance, default=None
                 The classifier whose output needs to be calibrated
+
+            inductive: bool, default = False
+                Flag specifying whether to return martingale statistics instead of calibrated probabilities
+
+            alphas : {array-like}, default = None
+                Alpha parameters of Cox calibration functions (see Section 2 in [1])
+
+            betas : {array-like}, shape (n_samples,), default = None
+                Beta parameters of Cox calibration functions (see Section 2 in [1])
+
+            jumping_rates: {array-like}, default = None
+                Jumping rates for the Composite Jumper algorithm described in [1]
+
+            pi : float, default = None
+                Passive capital parameter for the Composite Jumper algorithm described in [1]
 
 
             References
@@ -279,55 +150,198 @@ class ProtectedClassification:
 
     """
 
-    def __init__(self, estimator=None):
-        self.estimator = estimator
-        self.cal_probs = None
-        self.classes = None
-        self.active_weight = None
-        self.passive_weight = None
-
-    def calibrate(
+    def __init__(
             self,
-            y_test,
-            x_test=None,
-            test_probs=None,
+            estimator=None,
             alphas=None,
             betas=None,
             jumping_rates=None,
             pi=None,
-            return_martingale=False
     ):
+        self.estimator = estimator
+        self.alphas = alphas
+        self.betas = betas
+        self.jumping_rates = jumping_rates
+        self.pi = pi
+        self.cal_probs = None
+        self.classes = None
+        self.active_weight = None
+        self.passive_weight = None
+        self.log_sj_martingale = None
+        self.log_cj_martingale = None
+        self.mart_capital = None
+        self.n_classes = None
+        self.return_probs = None
 
-        """ Fits the Protected calibration algorithm to an underlying test set.
+        if self.betas is None:
+            self.betas = [1, 0.5, 2]
+
+        if self.jumping_rates is None:
+            self.jumping_rates = [10 ** (-2), 10 ** (-3), 10 ** (-4)]
+
+        if self.pi is None:
+            self.pi = 0.5
+
+    def calibrate_probs(self,
+                        p_pred,
+                        y
+                        ):
+        """ Calculates protected calibrated probabilities.
+
+                    Parameters
+                    ----------
+                    p_pred : {array-like}, shape (n_samples, n_classes)
+                        A set of probabilities to be calibrated
+
+                    y : {array-like}, shape (n_samples,)
+                        Associated class labels
+
+                    Returns
+                    ----------
+                    p_prime: {array-like}, shape (n_samples,)
+                        Calibrated probabilities
+
+                    References
+                    __________
+                    [1] Vovk, Vladimir, Ivan Petej, and Alex Gammerman. "Protected probabilistic classification."
+                    In Conformal and Probabilistic Prediction and Applications, pp. 297-299. PMLR, 2021.
+                    (arxiv version https://arxiv.org/pdf/2107.01726.pdf)
+                    """
+        if y is not None:
+            self.classes = np.unique(y)
+
+        self.n_classes = p_pred.shape[1]
+
+        if self.alphas is None:
+            self.alphas = \
+                [list(np.zeros(self.n_classes))] + \
+                [gen_alpha(ind, self.n_classes, 1) for ind in [self.n_classes - 1]] + \
+                [gen_alpha(ind, self.n_classes, -1) for ind in [self.n_classes - 1]]
+
+        n_jumping_rates = len(self.jumping_rates)
+        n_calibrators = len(self.betas) * len(self.alphas)
+
+        prob_list = np.zeros((self.n_classes, self.n_classes))
+
+        for i in range(self.n_classes):
+            prob_list[i, i] = 1
+        prob_list = list(prob_list)
+
+        cal_list = [list((a, b)) for a in self.alphas for b in self.betas]
+
+        if y is not None:
+            n_test = len(y)
+        else:
+            n_test = p_pred.shape[0]
+
+        # Defining storage for martingales
+        if self.log_sj_martingale is None:
+            self.log_sj_martingale = np.zeros((n_jumping_rates, n_test + 1))
+        if self.log_cj_martingale is None:
+            self.log_cj_martingale = np.zeros(n_test + 1)
+
+        # the normalized capital in each state (after normalization at the previous step)
+        if self.mart_capital is None:
+            self.mart_capital = np.zeros((n_jumping_rates, n_calibrators))
+            self.mart_capital[:, 0] = 1
+
+        # Processing the dataset
+        if self.passive_weight is None:
+            self.passive_weight = self.pi  # amount set aside (passive weight)
+        if self.active_weight is None:
+            self.active_weight = np.zeros((n_jumping_rates, n_calibrators))  # the weight of each active state
+            self.active_weight[:, 0] = (1 - self.pi) / n_jumping_rates  # initial weights
+
+        if y is not None:
+            y_encoded = y_encode(y)
+            p_prime = np.zeros((n_test, self.n_classes))
+            for n in range(n_test):  # going through all test observations
+                # Jump-mixing starts
+                for j_index in range(n_jumping_rates):
+                    capital = np.sum(self.active_weight[j_index, :])  # active capital for this jumping rate
+                    j_rate = self.jumping_rates[j_index]
+                    self.active_weight[j_index, :] = (1 - j_rate) * self.active_weight[j_index, :] \
+                                                    + capital * j_rate / n_calibrators
+                    self.mart_capital[j_index, :] = (1 - j_rate) * self.mart_capital[j_index, :] \
+                                                    + (j_rate / n_calibrators)
+                # Jump-mixing ends
+                g = np.empty(self.n_classes)  # pseudo prediction initialized
+                for prob_index, prob_i in enumerate(prob_list):
+                    # initializing the pseudo prediction to its passive component
+                    g[prob_index] = self.passive_weight \
+                                    * np.exp(-brier_loss(np.array(prob_i).reshape(1, -1), p_pred[n]))
+                    for k in range(n_calibrators):
+                        # prediction calibrated by the k-th calibrator
+                        cal_pp_k = cox_multiclass(p_pred[n], cal_list[k][0], cal_list[k][1])
+                        for j_index in range(n_jumping_rates):
+                            # accumulating predictions calibrated by the calibrators
+                            g[prob_index] += self.active_weight[j_index, k] * np.exp(
+                                -brier_loss(np.array(prob_i).reshape(1, -1), cal_pp_k))
+                    g[prob_index] = -np.log(g[prob_index])
+                # We need to solve equation for s, let's first try a shortcut:
+                s = (2 + np.sum(g)) / self.n_classes
+                for k_index in range(self.n_classes):
+                    p_prime[n, k_index] = (s - g[k_index]) / 2  # my prediction
+                # Updating the weights:
+                # updating the passive capital
+                self.passive_weight *= np.exp(-brier_loss(y_encoded[n].reshape(1, -1), p_pred[n]))
+                for k in range(n_calibrators):
+                    # base prediction calibrated by the k-th calibrator
+                    cal_pp_k = cox_multiclass(p_pred[n], cal_list[k][0], cal_list[k][1])
+                    for j_index in range(n_jumping_rates):
+                        # updating the active capital
+                        self.active_weight[j_index, k] *= np.exp(-brier_loss(y_encoded[n].reshape(1, -1), cal_pp_k))
+                        self.mart_capital[j_index, k] *= \
+                            np.exp(-brier_loss(y_encoded[n].reshape(1, -1), cal_pp_k)) / \
+                            np.exp(-brier_loss(y_encoded[n].reshape(1, -1), p_pred[n]))
+                for j_index in range(n_jumping_rates):
+                    self.log_sj_martingale[j_index, n + 1] = self.log_sj_martingale[j_index, n] + \
+                                                        np.log10(np.sum(self.mart_capital[j_index, :]))
+                    self.mart_capital[j_index, :] /= np.sum(self.mart_capital[j_index, :])
+                # Normalizing at each step (not needed):
+                capital = self.passive_weight + np.sum(self.active_weight[:, :])  # the overall weight
+                self.passive_weight /= capital  # normalization of the passive weight
+                self.active_weight[:, :] /= capital  # normalization of the active weights
+
+            if np.sum(p_prime < 0) > 0:
+                p_prime[p_prime < 0] = 0
+            if np.sum(p_prime > 1) > 0:
+                p_prime[p_prime > 1] = 1
+
+            for n in range(n_test + 1):
+                self.log_cj_martingale[n] = log_mean([0, log_mean(self.log_sj_martingale[:, n])])
+
+        else:
+            n_test = p_pred.shape[0]
+            p_prime = np.zeros((n_test, self.n_classes))
+            for n in range(n_test):
+                for k in range(n_calibrators):
+                    # prediction calibrated by the k-th calibrator
+                    cal_pp_k = cox_multiclass(p_pred[n], cal_list[k][0], cal_list[k][1])
+                    for j_index in range(n_jumping_rates):
+                        p_prime[n, :] += cal_pp_k * self.active_weight[j_index, k]
+
+        p_prime = p_prime / np.repeat(p_prime.sum(axis=1).reshape(-1, 1), self.n_classes, axis=1)
+
+        return p_prime
+
+    def fit(self, x, y, test_probs=None):
+
+        """ Fits the Protected calibration algorithm to an underlying dataset.
 
                 Parameters
                 ----------
-
-                y_test : {array-like}, shape (n_samples,)
-                    Class labels
-
-                x_test : {array-like}, shape (n_samples,), default = None
+                
+                x : {array-like}, shape (n_samples,)
                     Test set features (if class is constructed by passing
                     an underlying sci-kit learn classifier)
+
+                y : {array-like}, shape (n_samples,)
+                    Class labels
 
                 test_probs : {array-like}, shape (n_samples, n_classes), default = None
                     Test set probabilities (if class is constructed without passing
                     an underlying sci-kit learn classifier)
-
-                alphas : {array-like}, default = None
-                    Alpha parameters of Cox calibtration functions (see Section 2 in [1])
-
-                betas : {array-like}, shape (n_samples,), default = None
-                    Beta parameters of Cox calibtration functions (see Section 2 in [1])
-
-                jumping_rates: {array-like}, default = None
-                    Jumping rates for the Composite Jumper algorithm described in [1]
-
-                pi : float, default = None
-                    Passive capital parameter for the Composite Jumper algorithm described in [1]
-
-                return_martingale : bool, default = False
-                    Flag specifies whether to calculate and return martingale values
 
 
                 References
@@ -337,50 +351,55 @@ class ProtectedClassification:
                 (arxiv version https://arxiv.org/pdf/2107.01726.pdf)
         """
 
-        if self.estimator is not None and x_test is None:
+        if self.estimator is not None and x is None:
             raise Exception("Please provide a set of test examples to calibrate")
 
-        if self.estimator is None and x_test is not None:
+        if self.estimator is None and x is not None:
             raise Exception(
                 "Please initialise the ProtectedCalibration class with an underlying classification algorithm"
             )
 
-        if x_test is None and test_probs is None:
+        if x is None and test_probs is None:
             raise Exception("Please provide either a set of test examples to calibrate or test set probabilities")
 
-        if betas is None:
-            betas = [1, 0.5, 2]
         if test_probs is None:
             try:
                 check_is_fitted(self.estimator)
-                test_probs = self.estimator.predict_proba(x_test)
+                test_probs = self.estimator.predict_proba(x)
             except NotFittedError:
-                raise Exception("Please fit the underlying calibrator on the training set first")
+                raise Exception("Please fit the underlying estimator first")
 
-        if jumping_rates is None:
-            jumping_rates = [10 ** (-2), 10 ** (-3), 10 ** (-4)]
+        self.cal_probs = self.calibrate_probs(
+                    p_pred=test_probs,
+                    y=y
+                    )
 
-        if pi is None:
-            pi = 0.5
+    def predict_proba(self, x=None, y=None, test_probs=None, return_stats=False):
+        """ Outputs calibrated probabilities.
 
-        self.classes = np.unique(y_test)
-        n_classes = len(self.classes)
+            Returns
+            ----------
+            p_prime: {array-like}, shape (n_samples,n_classes)
+                Protected calibrated probabilities
+        """
+        if y is not None and x is None and test_probs is None:
+            raise Exception("For online protected classification please provide test points or probability outputs")
+        if y is None and x is None and test_probs is None:
+            if self.cal_probs is None:
+                raise Exception("Please fit the ProtectedClassification algorithm first")
+            p_prime = np.asarray(self.cal_probs)
+        else:
+            if test_probs is None:
+                test_probs = self.estimator.predict_proba(x)
 
-        if alphas is None:
-            alphas = \
-                [list(np.zeros(n_classes))] + \
-                [gen_alpha(ind, n_classes, 1) for ind in [n_classes - 1]] + \
-                [gen_alpha(ind, n_classes, -1) for ind in [n_classes - 1]]
+            self.return_probs = self.calibrate_probs(p_pred=test_probs, y=y)
+            p_prime = self.return_probs
 
-        self.cal_probs = calibrate_probs(
-            p_pred=test_probs,
-            y_test=y_test,
-            alphas=alphas,
-            betas=betas,
-            jumping_rates=jumping_rates,
-            pi=pi,
-            return_martingale=return_martingale
-        )
+        if return_stats is False:
+            return p_prime
+        else:
+            return p_prime, [self.log_sj_martingale, self.log_cj_martingale, self.mart_capital, self.active_weight,
+                             self.passive_weight]
 
     def predict(self, one_hot=True):
 
@@ -407,16 +426,3 @@ class ProtectedClassification:
         else:
             y_pred = np.array([self.classes[i] for i in idx])
         return y_pred
-
-    def predict_proba(self):
-        """ Outputs calibrated probabilities.
-
-            Returns
-            ----------
-            p_prime: {array-like}, shape (n_samples,n_classses)
-                Protected calibrated probabilities
-        """
-        if self.cal_probs is None:
-            raise Exception("Please calibrate the underlying probabilities first")
-        p_prime = np.asarray(self.cal_probs)
-        return p_prime
