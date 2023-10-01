@@ -1,1 +1,1 @@
-from .protected_classification import ProtectedClassification
+from .protected_classification import ProtectedClassification, cox_multiclass, gen_alpha
