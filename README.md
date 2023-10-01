@@ -56,8 +56,8 @@ print('Protected classification log loss (dataset shift) ' + f'{log_loss(y_test,
 ### Examples
 Further examples can be found in the github repository https://github.com/ip200/protected-calibration in the *examples* folder:
 
-- calibration.ipynb for an example of the method appplied to calibrate the outputs of the underlying algorithm
-- protected_classification.ipynb for an example of the method used to protect the underlying algorithm under various forms of dataset shift
+- [simple_classification.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/simple_classification.ipynb) for an example of the method appplied to calibrate the outputs of the underlying algorithm
+- [protected_classification.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_classification.ipynb) for an example of the method used to protect the underlying algorithm under various forms of dataset shift
 
 ### Citation
 If you find this library useful please consider citing:
