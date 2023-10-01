@@ -10,7 +10,7 @@ pip install protected-classification
 The algorithm can be applied on top of an underlying scikit-learn algorithm for binary and multiclass classification problems.
 ### Usage
 ```commandline
-from src.protected_classification import ProtectedClassification
+from protected_classification import ProtectedClassification
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import log_loss
