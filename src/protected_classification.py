@@ -401,7 +401,7 @@ class ProtectedClassification:
             return p_prime, [self.log_sj_martingale, self.log_cj_martingale, self.mart_capital, self.active_weight,
                              self.passive_weight]
 
-    def predict(self, one_hot=True):
+    def predict(self, x=None, y=None, test_probs=None, one_hot=False):
 
         """ Outputs calibrated predictions.
 
@@ -416,10 +416,10 @@ class ProtectedClassification:
                 Protected calibrated probabilities
         """
 
-        if self.cal_probs is None:
-            raise Exception("Please calibrate the underlying probabilities first")
+        if self.return_probs is None:
+            self.return_probs = self.predict_proba(x=x, y=y, test_probs=test_probs)
 
-        idx = np.argmax(self.cal_probs, axis=-1)
+        idx = np.argmax(self.return_probs, axis=-1)
         if one_hot:
             y_pred = np.zeros(self.cal_probs.shape)
             y_pred[np.arange(y_pred.shape[0]), idx] = int(1)

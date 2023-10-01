@@ -8,7 +8,7 @@ This library contains the Python implementation of Protected probabilistic class
 pip install protected-classification
 ```
 The algorithm can be applied on top of an underlying scikit-learn algorithm for binary and multiclass classification problems.
-### Example Usage
+### Usage
 ```commandline
 from src.protected_classification import ProtectedClassification
 from sklearn.model_selection import train_test_split
@@ -16,6 +16,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import log_loss
 from sklearn.datasets import make_classification
 import numpy as np
+
+np.random.seed(1)
 
 X, y = make_classification(n_samples=1000, n_classes=2, n_informative=10, random_state=1)
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=1)
@@ -26,12 +28,12 @@ p_test = clf.predict_proba(X_test)
 # Initialise Protected classification
 pc = ProtectedClassification(estimator=clf)
 
-# Calibrate test output probabilities (assuming that test examples arrive sequentially)
-pc.calibrate(y_test, X_test)
-p_prime = pc.predict_proba()
+# Calibrate test output probabilities
+pc.fit(X_train, y_train)
+p_prime = pc.predict_proba(X_test)
 
 # Compare log loss of underlying RF algorithm and Protected classification
-print('Underlying RF log_loss (no dataset shift) ' + f'{log_loss(y_test, p_test):.3f}')
+print('Underlying classifier log_loss (no dataset shift) ' + f'{log_loss(y_test, p_test):.3f}')
 print('Protected classification log loss (no dataset shift) ' + f'{log_loss(y_test, p_prime):.3f}')
 
 #  Assume a dataset shift where a random portion of the class labels is set to a single class
@@ -40,16 +42,15 @@ ind = np.random.permutation(len(y_test))
 X_test = X_test[ind]
 y_test = y_test[ind]    
 
-# Generate RF and Protected output probabilities
 p_test = clf.predict_proba(X_test)
+
+# Generate protected output probabilities  (assuming that test examples arrive sequentially)
 pc = ProtectedClassification(estimator=clf)
-pc.calibrate(y_test, X_test)
-p_prime = pc.predict_proba()
+p_prime = pc.predict_proba(X_test, y_test)
 
 # Compare log loss of underlying RF algorithm and Protected classification
-print('Underlying RF log_loss (dataset shift) ' + f'{log_loss(y_test, p_test):.3f}')
+print('Underlying classifier log_loss (dataset shift) ' + f'{log_loss(y_test, p_test):.3f}')
 print('Protected classification log loss (dataset shift) ' + f'{log_loss(y_test, p_prime):.3f}')
-
 ```
 
 ### Examples
