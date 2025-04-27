@@ -6,6 +6,9 @@ This library contains the Python implementation of Protected probabilistic class
 ### Installation
 ```commandline
 pip install protected-classification
+```
+### Installation (conda)
+```commandline
 conda install conda-forge::protected-classification
 ```
 The algorithm can be applied on top of an underlying scikit-learn algorithm for binary and multiclass classification problems.
