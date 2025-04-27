@@ -9,7 +9,7 @@ pip install protected-classification
 ```
 The algorithm can be applied on top of an underlying scikit-learn algorithm for binary and multiclass classification problems.
 ### Usage
-```commandline
+```python
 from protected_classification import ProtectedClassification
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
@@ -56,8 +56,11 @@ print('Protected classification log loss (dataset shift) ' + f'{log_loss(y_test,
 ### Examples
 Further examples can be found in the github repository https://github.com/ip200/protected-calibration in the *examples* folder:
 
-- [simple_classification.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/simple_classification.ipynb) for an example of the method appplied to calibrate the outputs of the underlying algorithm
-- [protected_classification.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_classification.ipynb) for an example of the method used to protect the underlying algorithm under various forms of dataset shift
+- [protected-batch.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected-batch.ipynb) for an example of the method appplied to calibrate the outputs of the underlying algorithm in batch mode
+- [protected_classification.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_classification.ipynb) for an example of the method used to protect the underlying algorithm under dataset shift
+- [protected_multiclass.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_multiclass.ipynb) the equivalent for multi-class problems
+- [protected_streaming.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_streaming.ipynb) protected classification applied to streaming data problems
+
 
 ### Citation
 If you find this library useful please consider citing:
