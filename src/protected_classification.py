@@ -424,7 +424,7 @@ class ProtectedClassification:
         if return_stats is False:
             return p_prime
         else:
-            stats = {'log_sj_martingale': self.log_sj_martingale, 'log_scj_martingale': self.log_cj_martingale,
+            stats = {'log_sj_martingale': self.log_sj_martingale, 'log_cj_martingale': self.log_cj_martingale,
                      'mart_capital': self.mart_capital, 'active_weight': self.active_weight,
                      'passive_weight': self.passive_weight}
             return p_prime, stats
