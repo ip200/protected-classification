@@ -61,9 +61,9 @@ print('Protected classification log loss (dataset shift) ' + f'{log_loss(y_test,
 Further examples can be found in the github repository https://github.com/ip200/protected-calibration in the *examples* folder:
 
 - [protected-batch.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected-batch.ipynb) for an example of the method appplied to calibrate the outputs of the underlying algorithm in batch mode
-- [protected_classification.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_classification.ipynb) for an example of the method used to protect the underlying algorithm under dataset shift
-- [protected_multiclass.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_multiclass.ipynb) the equivalent for multi-class problems
-- [protected_streaming.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected_streaming.ipynb) protected classification applied to streaming data problems
+- [protected-classification.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected-classification.ipynb) for an example of the method used to protect the underlying algorithm under dataset shift
+- [protected-multiclass.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected-multiclass.ipynb) the equivalent for multi-class problems
+- [protected-streaming.ipynb](https://github.com/ip200/protected-classification/blob/main/notebooks/protected-streaming.ipynb) protected classification applied to streaming data problems
 
 
 ### Citation
