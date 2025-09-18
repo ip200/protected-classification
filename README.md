@@ -69,4 +69,5 @@ Further examples can be found in the github repository https://github.com/ip200/
 ### Citation
 If you find this library useful please consider citing:
 
-- Vovk, Vladimir, Ivan Petej, and Alex Gammerman. "Protected probabilistic classification." In Conformal and Probabilistic Prediction and Applications, pp. 297-299. PMLR, 2021. (arxiv version https://arxiv.org/pdf/2107.01726.pdf)
+- Ivan Petej, "Protected Probabilistic Classification Library", arXiv:2509.11267, https://arxiv.org/abs/2509.11267
+- Vladimir Vovk, Ivan Petej, and Alex Gammerman. "Protected probabilistic classification." In Conformal and Probabilistic Prediction and Applications, pp. 297-299. PMLR, 2021. (arxiv version https://arxiv.org/pdf/2107.01726.pdf)
